@@ -53,7 +53,7 @@ return (
       <div className='flex justify-between items-center w-72 p-4 px-6 bg-white rounded-xl border border-gray-200'>
         <div className='text-slate-600'>
           <p className='text-sm'>Active Plan</p>
-          <h2 className='text-xl font-semibold'><Protect plan='premium ' fallback='Free'>Premium</Protect></h2>
+          <h2 className='text-xl font-semibold'><Protect plan='premium' fallback='Free'>Premium</Protect></h2>
         </div>
         <div className='w-10 h-10 rounded-lg bg-gradient-to-br from-[#FF61C5] to-[#9E53EE] text-white flex justify-center items-center'>
           <Gem className='w-5 text-white' />
