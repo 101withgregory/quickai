@@ -17,47 +17,60 @@ function GenerateImages() {
         const [loading, setLoading] = useState(false);
            const [content, setContent] = useState('');
            const {getToken} = useAuth()
-      const onSubmitHandler = async (e)=>{
-        e.preventDefault();
-        try {
-          setLoading(true);
-          const prompt = `Generate an image of ${input} in the style ${selectedStyle}`
+     const onSubmitHandler = async (e) => {
+  e.preventDefault();
+  console.log("Button clicked");
 
-          const response = await axios.post('/api/ai/generate-image', {prompt, publish}, {headers: {
-                    Authorization: `Bearer ${await getToken()}`
-                  }})
-                  const data = response.data
-                  if(data.success){
-                    setContent(data.content)
-                  }else{
-                    toast.error(data.message)
-                  }
-        } catch (error) {
-          // This catch block handles network errors or non-2xx HTTP status codes
-        // (like 402, 401, 500 etc.) returned by your backend.
-        if (error.response) {
-            // The request was made and the server responded with a status code
-            // that falls out of the range of 2xx
-            if (error.response.status === 402) {
-                // Specific message for HTTP 402 "Payment Required"
-                toast.error("Subscribe to premium to use this feature!");
-            } else if (error.response.data && error.response.data.message) {
-                // If the server sent a specific error message in the response body
-                toast.error(error.response.data.message);
-            } else {
-                // Generic message for other HTTP error status codes (e.g., 400, 401, 500)
-                toast.error(`Request failed with status code ${error.response.status}`);
-            }
-        } else if (error.request) {
-            // The request was made but no response was received (e.g., network error, server down)
-            toast.error("No response from server. Please check your network connection.");
-        } else {
-            // Something happened in setting up the request that triggered an Error
-            toast.error(`Error: ${error.message}`);
-        }
-        }
-        setLoading(false)
+  if (!input || !selectedStyle) {
+    toast.error("Please enter a prompt and select a style.");
+    return;
+  }
+
+  try {
+    setLoading(true);
+    const prompt = `Generate an image of ${input} in the style ${selectedStyle}`;
+    const token = await getToken();
+
+    const response = await axios.post(
+      "/api/ai/generate-image",
+      { prompt, publish },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       }
+    );
+
+    const data = response.data;
+    console.log("Response:", data);
+    if(!data.success){
+      console.log(data.message);
+      
+    }
+    if (data.success) {
+      setContent(data.content);
+    } else {
+      toast.error(data.message);
+    }
+  } catch (error) {
+    if (error.response) {
+      if (error.response.status === 402) {
+        toast.error("Subscribe to premium to use this feature!");
+      } else if (error.response.data?.message) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error(`Request failed with status code ${error.response.status}`);
+      }
+    } else if (error.request) {
+      toast.error("No response from server. Please check your network connection.");
+    } else {
+      toast.error(`Error: ${error.message}`);
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+
   return (
      <div className='flex h-full overflow-y-scroll p-6 items-start max-sm:flex-wrap gap-4 text-slate-700'>
      {/* Left col */}
@@ -106,10 +119,10 @@ function GenerateImages() {
           </div>
 
             ):(
-              <div className='mt-3 h-full overflow-y-scroll text-sm text-slate-600'>
-                                          <div className='reset-tw '>
-                                             <Markdown>{content}</Markdown>
-                                          </div>                                                 </div>
+              <div>
+              <img src={content} alt='image' className='mt-3 w-full h-full'/>
+              </div>
+                                                        
             )
           }
           

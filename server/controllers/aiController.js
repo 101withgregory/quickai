@@ -4,6 +4,7 @@ import { clerkClient } from "@clerk/express";
 import axios from "axios";
 import {v2 as cloudinary} from 'cloudinary'
 import fs from 'fs'
+import FormData from 'form-data';
 import pdf from 'pdf-parse/lib/pdf-parse.js'
 const AI = new OpenAI({
     apiKey: process.env.GEMINI_API_KEY,
@@ -91,62 +92,72 @@ res.json({success:true, content})
     }
 }
 export const generateImage = async (req, res) => {
-    try {
-        const { userId } = req.auth();
-        const { prompt, publish } = req.body;
-        const plan = req.plan;
-
-        console.log('User Plan (inside generateImage):', plan); // Confirming plan
-        console.log('User ID (inside generateImage):', userId); // Confirming user ID
-
-        if (plan !== 'premium') {
-            return res.json({ success: false, message: 'This feature is only available for premium subscriptions' });
-        }
-
-        const formData = new FormData();
-        formData.append('prompt', prompt);
-
-        // --- Potentially problematic call to Clipdrop ---
-        const { data } = await axios.post("https://clipdrop-api.co/text-to-image/v1", formData, {
-            method: 'POST', // Axios defaults to POST for axios.post(), so this line is redundant but harmless.
-            headers: {
-                'x-api-key': process.env.CLIPDROP_API_KEY,
-            },
-            responseType: "arraybuffer",
-        });
-
-        // --- Corrected Buffer conversion (make sure this is saved!) ---
-        const base64Image = `data:image/png;base64, ${Buffer.from(data, 'binary').toString('base64')}`;
-
-        // --- Potentially problematic call to Cloudinary ---
-        const { secure_url } = await cloudinary.uploader.upload(base64Image);
-
-        // --- Potentially problematic SQL insert ---
-        await sql` INSERT INTO creations (user_id, prompt, content, type, publish) 
-                   VALUES (${userId}, ${prompt}, ${secure_url}, 'image', ${publish ?? false})`;
-
-        res.json({ success: true, content: secure_url });
-
-    } catch (error) {
-        // --- ADD THIS DETAILED LOGGING ---
-        console.error("----- Error in generateImage -----");
-        console.error("Full Error Object:", error);
-        if (error.response) { // This means it's an Axios error response from an API call (Clipdrop or Cloudinary)
-            console.error("Error Response Status:", error.response.status);
-            console.error("Error Response Data:", error.response.data ? error.response.data.toString() : 'No response data'); // Convert buffer to string if necessary
-            console.error("Error Response Headers:", error.response.headers);
-        } else if (error.request) { // The request was made but no response was received
-            console.error("Error Request (no response):", error.request);
-        } else { // Something else happened in setting up the request or during execution
-            console.error("Error Message:", error.message);
-            console.error("Error Stack:", error.stack);
-        }
-        console.error("---------------------------------");
-
-        // Send a generic message to the frontend, as before
-        res.json({ success: false, message: 'Please subscribe to premium to unlock this feature .' });
+  try {
+    const { userId } = req.auth();
+    const { prompt, publish } = req.body;
+    const plan = req.plan;
+    if (plan !== 'premium') {
+      return res.json({
+        success: false,
+        message: 'This feature is only available for premium subscriptions',
+      });
     }
+
+    if (!prompt) {
+      return res.json({
+        success: false,
+        message: 'Prompt is required to generate an image',
+      });
+    }
+
+    // Prepare prompt for ClipDrop
+    const formData = new FormData();
+    formData.append('prompt', prompt);
+
+    // Call ClipDrop API
+    const clipdropResponse = await axios.post(
+      'https://clipdrop-api.co/text-to-image/v1',
+      formData,
+      {
+        headers: {
+          'x-api-key': process.env.CLIPDROP_API_KEY,
+          ...formData.getHeaders(),
+        },
+        responseType: 'arraybuffer',
+      }
+    );
+
+    const base64Image = `data:image/png;base64,${Buffer.from(
+      clipdropResponse.data,
+      'binary'
+    ).toString('base64')}`;
+
+    // Upload to Cloudinary
+    const uploadResponse = await cloudinary.uploader.upload(base64Image);
+
+    const { secure_url } = uploadResponse;
+
+    if (!secure_url) {
+      throw new Error("Failed to upload image to Cloudinary.");
+    }
+
+    // Save to DB (Assuming you have a query builder or raw SQL)
+    await sql`INSERT INTO creations (user_id, prompt, content, type, publish) 
+              VALUES (${userId}, ${prompt}, ${secure_url}, 'image', ${publish ?? false})`;
+
+    res.json({ success: true, content: secure_url });
+  } catch (error) {
+    console.error("❌ Image generation error:", error);
+
+    const fallbackMessage =
+      error?.message ||
+      error?.response?.data?.message ||
+      'An unknown error occurred while generating the image.';
+
+    res.json({ success: false, message: fallbackMessage });
+  }
 };
+
 export const removeImageBackground = async (req, res) =>{
     try{
         const {userId} = req.auth();
@@ -236,7 +247,7 @@ const response = await AI.chat.completions.create({
 const content = response.choices[0].message.content
 
 await sql` INSERT INTO creations (user_id, prompt, content, type) 
-VALUES (${userId},'Review the uploaded resume',${content} 'resume-review')`;
+VALUES (${userId},'Review the uploaded resume',${content} ,'resume-review')`;
 
 res.json({success:true, content})
     }catch(error){

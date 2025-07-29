@@ -18,7 +18,7 @@ function ReviewResume() {
     try {
           setLoading(true);
           const formData = new FormData()
-          formData.append('resume', input);
+          formData.append('image', input);
               const {data} = await axios.post('/api/ai/resume-review',formData, {headers: {
                         Authorization: `Bearer ${await getToken()}`
                       }})
