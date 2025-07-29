@@ -23,17 +23,38 @@ function GenerateImages() {
           setLoading(true);
           const prompt = `Generate an image of ${input} in the style ${selectedStyle}`
 
-          const {data} = await axios.post('/api/ai/generate-image', {prompt, publish}, {headers: {
+          const response = await axios.post('/api/ai/generate-image', {prompt, publish}, {headers: {
                     Authorization: `Bearer ${await getToken()}`
                   }})
-          
+                  const data = response.data
                   if(data.success){
                     setContent(data.content)
                   }else{
                     toast.error(data.message)
                   }
         } catch (error) {
-          toast.error(error.message)
+          // This catch block handles network errors or non-2xx HTTP status codes
+        // (like 402, 401, 500 etc.) returned by your backend.
+        if (error.response) {
+            // The request was made and the server responded with a status code
+            // that falls out of the range of 2xx
+            if (error.response.status === 402) {
+                // Specific message for HTTP 402 "Payment Required"
+                toast.error("Subscribe to premium to use this feature!");
+            } else if (error.response.data && error.response.data.message) {
+                // If the server sent a specific error message in the response body
+                toast.error(error.response.data.message);
+            } else {
+                // Generic message for other HTTP error status codes (e.g., 400, 401, 500)
+                toast.error(`Request failed with status code ${error.response.status}`);
+            }
+        } else if (error.request) {
+            // The request was made but no response was received (e.g., network error, server down)
+            toast.error("No response from server. Please check your network connection.");
+        } else {
+            // Something happened in setting up the request that triggered an Error
+            toast.error(`Error: ${error.message}`);
+        }
         }
         setLoading(false)
       }

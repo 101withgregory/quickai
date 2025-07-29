@@ -90,39 +90,63 @@ res.json({success:true, content})
         res.json({success:false, message:error.message})
     }
 }
-export const generateImage = async (req, res) =>{
-    try{
-        const {userId} = req.auth();
-        const {prompt, publish} = req.body;
+export const generateImage = async (req, res) => {
+    try {
+        const { userId } = req.auth();
+        const { prompt, publish } = req.body;
         const plan = req.plan;
 
-        if(plan !== 'premium'){
-            return res.json({success:false, message: 'This feature is only available for premium subscriptions'})
+        console.log('User Plan (inside generateImage):', plan); // Confirming plan
+        console.log('User ID (inside generateImage):', userId); // Confirming user ID
+
+        if (plan !== 'premium') {
+            return res.json({ success: false, message: 'This feature is only available for premium subscriptions' });
         }
-      const formData = new FormData()
-formData.append('prompt', prompt)
 
-const {data} = await axios.post("https://clipdrop-api.co/text-to-image/v1", formData, {
-    method: 'POST',
-  headers: {
-    'x-api-key': process.env.CLIPDROP_API_KEY,
-  },
-  responseType:"arraybuffer",
-})
-const base64Image= `data:image/png;base64, ${Buffer.from(data, 'binary'), toString('base64')}`
+        const formData = new FormData();
+        formData.append('prompt', prompt);
 
-const {secure_url} = await cloudinary.uploader.upload(base64Image);
+        // --- Potentially problematic call to Clipdrop ---
+        const { data } = await axios.post("https://clipdrop-api.co/text-to-image/v1", formData, {
+            method: 'POST', // Axios defaults to POST for axios.post(), so this line is redundant but harmless.
+            headers: {
+                'x-api-key': process.env.CLIPDROP_API_KEY,
+            },
+            responseType: "arraybuffer",
+        });
 
-await sql` INSERT INTO creations (user_id, prompt, content, type,publish) 
-VALUES (${userId}, ${prompt}, ${secure_url}, 'image', ${publish ?? false})
-`
+        // --- Corrected Buffer conversion (make sure this is saved!) ---
+        const base64Image = `data:image/png;base64, ${Buffer.from(data, 'binary').toString('base64')}`;
 
-res.json({success:true, content:secure_url})
-    }catch(error){
-        console.log(error.message)
-        res.json({success:false, message:error.message})
+        // --- Potentially problematic call to Cloudinary ---
+        const { secure_url } = await cloudinary.uploader.upload(base64Image);
+
+        // --- Potentially problematic SQL insert ---
+        await sql` INSERT INTO creations (user_id, prompt, content, type, publish) 
+                   VALUES (${userId}, ${prompt}, ${secure_url}, 'image', ${publish ?? false})`;
+
+        res.json({ success: true, content: secure_url });
+
+    } catch (error) {
+        // --- ADD THIS DETAILED LOGGING ---
+        console.error("----- Error in generateImage -----");
+        console.error("Full Error Object:", error);
+        if (error.response) { // This means it's an Axios error response from an API call (Clipdrop or Cloudinary)
+            console.error("Error Response Status:", error.response.status);
+            console.error("Error Response Data:", error.response.data ? error.response.data.toString() : 'No response data'); // Convert buffer to string if necessary
+            console.error("Error Response Headers:", error.response.headers);
+        } else if (error.request) { // The request was made but no response was received
+            console.error("Error Request (no response):", error.request);
+        } else { // Something else happened in setting up the request or during execution
+            console.error("Error Message:", error.message);
+            console.error("Error Stack:", error.stack);
+        }
+        console.error("---------------------------------");
+
+        // Send a generic message to the frontend, as before
+        res.json({ success: false, message: 'Please subscribe to premium to unlock this feature .' });
     }
-}
+};
 export const removeImageBackground = async (req, res) =>{
     try{
         const {userId} = req.auth();
@@ -130,7 +154,7 @@ export const removeImageBackground = async (req, res) =>{
         const plan = req.plan;
 
         if(plan !== 'premium'){
-            return res.json({success:false, message: 'This feature is only available for premium subscriptions'})
+            return res.json({success:false, message: error.message})
         }
 
 const {secure_url} = await cloudinary.uploader.upload(image.path, {

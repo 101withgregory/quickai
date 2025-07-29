@@ -15,7 +15,7 @@ function Dashboard() {
   const { getToken } = useAuth()
   const getDashboardData = async () => {
     try {
-      const { data } = axios.get('/api/user/get-user-creations', {
+      const { data } =await  axios.get('/api/user/get-user-creations', {
         headers: {
           Authorization: `Bearer ${await getToken()}`
         }
