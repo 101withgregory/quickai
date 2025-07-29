@@ -33,7 +33,7 @@ function Community() {
 
   const imageLikeToggle = async(id)=>{
     try {
-      const {data} = axios.post('/api/user/toggle-like-creation',{id}, {
+      const {data} =await axios.post('/api/user/toggle-like-creation',{id}, {
         headers: {
           Authorization :`Bearer ${await getToken()}`
         }
