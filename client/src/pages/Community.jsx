@@ -15,7 +15,7 @@ function Community() {
   const { getToken } = useAuth()
   const fetchCreations = async () => {
     try {
-      const {data} = axios.get('/api/user/get-published-creations', {
+      const {data} =await axios.get('/api/user/get-published-creations', {
         headers: {
           Authorization :`Bearer ${await getToken()}`
         }
